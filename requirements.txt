@@ -218,6 +218,7 @@ psutil @ file:///work/perseverance-python-buildout/croot/psutil_1698863411559/wo
 ptyprocess @ file:///tmp/build/80754af9/ptyprocess_1609355006118/work/dist/ptyprocess-0.7.0-py2.py3-none-any.whl
 pure-eval @ file:///opt/conda/conda-bld/pure_eval_1646925070566/work
 py-cpuinfo @ file:///work/perseverance-python-buildout/croot/py-cpuinfo_1698865397566/work
+pyaes==1.6.1
 pyarrow @ file:///croot/pyarrow_1707330824290/work/python
 pyasn1 @ file:///Users/ktietz/demo/mc3/conda-bld/pyasn1_1629708007385/work
 pyasn1-modules==0.2.8
@@ -278,6 +279,7 @@ rfc3986-validator @ file:///work/perseverance-python-buildout/croot/rfc3986-vali
 rich @ file:///work/perseverance-python-buildout/croot/rich_1698846912932/work
 rope @ file:///croot/rope_1708963153974/work
 rpds-py @ file:///work/perseverance-python-buildout/croot/rpds-py_1698982686240/work
+rsa==4.9
 Rtree @ file:///work/perseverance-python-buildout/croot/rtree_1698900851071/work
 ruamel-yaml-conda @ file:///work/perseverance-python-buildout/croot/ruamel_yaml_1698874047131/work
 ruamel.yaml @ file:///work/perseverance-python-buildout/croot/ruamel.yaml_1698863605521/work
@@ -317,6 +319,7 @@ sympy @ file:///croot/sympy_1701397643339/work
 tables @ file:///croot/pytables_1705614842881/work
 tabulate @ file:///work/perseverance-python-buildout/croot/tabulate_1701748610754/work
 tblib @ file:///Users/ktietz/demo/mc3/conda-bld/tblib_1629402031467/work
+Telethon==1.39.0
 tenacity @ file:///work/perseverance-python-buildout/croot/tenacity_1698863691366/work
 terminado @ file:///work/perseverance-python-buildout/croot/terminado_1698874934826/work
 text-unidecode @ file:///Users/ktietz/demo/mc3/conda-bld/text-unidecode_1629401354553/work

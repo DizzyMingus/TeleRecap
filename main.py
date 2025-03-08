@@ -5,6 +5,9 @@ import datetime
 from dotenv import load_dotenv
 from telegram import Update, Bot
 from telegram.ext import Application, CommandHandler, filters, ContextTypes
+from telethon import TelegramClient
+from telethon.sessions import StringSession
+import asyncio
 
 # Configure logging
 logging.basicConfig(
@@ -17,6 +20,14 @@ load_dotenv()
 
 # Bot token for the Telegram Bot API
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+
+# Telegram Client API credentials
+API_ID = 24907137
+API_HASH = "1778d8f3be4a6961acd6016e81aec514"
+SESSION_STRING = os.getenv('TELEGRAM_SESSION_STRING', '')
+
+# Initialize Telegram Client
+client = None
 
 # Store user preferences
 user_preferences = {}
@@ -80,32 +91,45 @@ async def set_topic_command(update: Update,
 # Function to fetch messages from a channel
 async def fetch_channel_messages(bot: Bot, channel_username: str, limit=100):
     try:
-        # Get chat information
-        chat = await bot.get_chat(channel_username)
-
-        # Get messages from the channel
+        global client
+        
+        # Initialize the Telegram client if not already done
+        if client is None:
+            client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+            await client.connect()
+            
+            # Check if we need to sign in
+            if not await client.is_user_authorized():
+                logger.warning("Telethon client is not authorized. Sessions string might be invalid or missing.")
+                # We can't perform authorization here as it's an automated process
+                # You would need to run a separate script to generate a session string
+                
+                # Return placeholder message
+                return [{
+                    'date': datetime.datetime.now(),
+                    'text': "Error: Telegram client is not authorized. Contact the administrator."
+                }]
+        
+        # Get entity (channel) information
+        entity = await client.get_entity(channel_username)
+        
+        # Fetch messages from the channel
         messages = []
-
-        # Unfortunately, bot API has limitations for getting message history
-        # For public channels, we can only get the latest messages
-        # Using getUpdates won't work for channel history
-
-        # As a simple placeholder, we'll just acknowledge we can't get much history
-        # In a real app, you'd need to use Telegram API (not Bot API) with a user account
-
-        # Add a placeholder message to indicate the limitation
-        messages.append({
-            'date':
-            datetime.datetime.now(),
-            'text':
-            "Note: Telegram Bot API has limitations for retrieving channel message history. "
-            "This bot can only interact with new messages it receives after being added to a channel."
-        })
-
+        async for message in client.iter_messages(entity, limit=limit):
+            if message.text:  # Only include messages with text
+                messages.append({
+                    'date': message.date,
+                    'text': message.text,
+                    'id': message.id
+                })
+        
         return messages
     except Exception as e:
         logger.error(f"Error fetching messages: {e}")
-        return []
+        return [{
+            'date': datetime.datetime.now(),
+            'text': f"Error fetching messages: {str(e)}"
+        }]
 
 
 # Command to get messages
@@ -190,6 +214,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def main():
+    global client
+    
     # Initialize the Telegram Bot
     application = Application.builder().token(BOT_TOKEN).build()
 
@@ -200,20 +226,30 @@ async def main():
     application.add_handler(CommandHandler("settopic", set_topic_command))
     application.add_handler(CommandHandler("get", get_messages_command))
 
+    # Initialize Telethon client
+    try:
+        client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+        await client.connect()
+        if not await client.is_user_authorized():
+            logger.warning("Telethon client is not authorized. Using a valid SESSION_STRING env variable is recommended.")
+    except Exception as e:
+        logger.error(f"Error initializing Telethon client: {e}")
+
     # Start the Bot
     await application.initialize()
     await application.start()
     await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
 
-    # try:
-    # Keep the bot running until it's stopped
-    await application.updater._stop_polling()
-    # finally:
-    #     # Properly shutdown the application
-    #     await application.stop()
-    #     await application.shutdown()
+    try:
+        # Keep the bot running until it's stopped
+        await application.updater._stop_polling()
+    finally:
+        # Properly shutdown the application and client
+        if client:
+            await client.disconnect()
+        await application.stop()
+        await application.shutdown()
 
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
