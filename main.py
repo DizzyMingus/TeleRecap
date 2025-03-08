@@ -76,11 +76,15 @@ async def fetch_channel_messages(bot: Bot, channel_username: str, limit=100):
 
         # Get messages from the channel
         messages = []
-        async for message in bot.get_chat_history(chat.id, limit=limit):
-            if message.text:
+        # The python-telegram-bot library doesn't have get_chat_history method
+        # We need to use other methods like getChatHistory API method
+        result = await bot.get_updates(chat_id=chat.id, limit=limit)
+        
+        for message in result:
+            if hasattr(message, 'message') and hasattr(message.message, 'text'):
                 messages.append({
-                    'date': message.date,
-                    'text': message.text
+                    'date': message.message.date,
+                    'text': message.message.text
                 })
 
         return messages
@@ -174,4 +178,10 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        pass  # Graceful exit on keyboard interrupt
+    except RuntimeError as e:
+        if "Cannot close a running event loop" not in str(e):
+            raise  # Re-raise if it's not the specific RuntimeError we're handling
