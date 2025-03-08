@@ -216,22 +216,41 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def main():
     global client
     
+    # Log bot initialization with masked token
+    masked_token = BOT_TOKEN[:4] + '*' * (len(BOT_TOKEN) - 8) + BOT_TOKEN[-4:] if BOT_TOKEN else None
+    logger.info(f"Initializing Telegram Bot with token: {masked_token}")
+    
     # Initialize the Telegram Bot
     application = Application.builder().token(BOT_TOKEN).build()
+    logger.info("Telegram Bot application built successfully")
 
     # Add command handlers
+    logger.info("Registering command handlers...")
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("setchannel", set_channel_command))
     application.add_handler(CommandHandler("settopic", set_topic_command))
     application.add_handler(CommandHandler("get", get_messages_command))
+    logger.info("Command handlers registered successfully")
 
     # Initialize Telethon client
+    logger.info("Starting Telethon client authentication")
     try:
+        # Log session string existence (masked for security)
+        session_exists = "Available" if SESSION_STRING else "Not available"
+        logger.info(f"Telethon session string: {session_exists}")
+        
+        logger.info(f"Initializing Telethon client with API_ID: {API_ID}")
         client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+        
+        logger.info("Connecting to Telegram servers...")
         await client.connect()
+        
+        logger.info("Checking authorization status...")
         if not await client.is_user_authorized():
             logger.warning("Telethon client is not authorized. Using a valid SESSION_STRING env variable is recommended.")
+        else:
+            logger.info("Telethon client successfully authorized")
     except Exception as e:
         logger.error(f"Error initializing Telethon client: {e}")
 
