@@ -8,9 +8,20 @@ logging.basicConfig(
     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Your API credentials
-API_ID = 24907137
-API_HASH = "1778d8f3be4a6961acd6016e81aec514"
+# Load environment variables
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+# Your API credentials from environment variables
+API_ID = int(os.getenv('TELEGRAM_API_ID', '0'))
+API_HASH = os.getenv('TELEGRAM_API_HASH', '')
+
+if API_ID == 0 or not API_HASH:
+    logger.error("API_ID or API_HASH not found in environment variables")
+    print("Please set TELEGRAM_API_ID and TELEGRAM_API_HASH in your .env file")
+    exit(1)
 
 logger.info("Starting Telegram session string generation")
 logger.info(f"Using API_ID: {API_ID}")

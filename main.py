@@ -22,8 +22,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 # Telegram Client API credentials
-API_ID = 24907137
-API_HASH = "1778d8f3be4a6961acd6016e81aec514"
+API_ID = int(os.getenv('TELEGRAM_API_ID', '0'))
+API_HASH = os.getenv('TELEGRAM_API_HASH', '')
 SESSION_STRING = os.getenv('TELEGRAM_SESSION_STRING', '')
 
 # Initialize Telegram Client
