@@ -7,23 +7,32 @@ import asyncio
 from dotenv import load_dotenv
 from datetime import datetime, timezone
 from rag import create_rag_graph  # Import RAG functionality
+from get_telegram_client import get_bot, get_user_client  # Import client factory functions
 
 # Load environment variables from .env file
 load_dotenv()
+
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+PHONE_NUMBER = os.getenv('PHONE_NUMBER')
+
+bot = get_bot()
+user_client = get_user_client()
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Get credentials from environment variables
-BOT_TOKEN = os.getenv('BOT_TOKEN')
-API_ID = int(os.getenv('API_ID'))
-API_HASH = os.getenv('API_HASH')
-PHONE_NUMBER = os.getenv('PHONE_NUMBER')
+# Get the bot username for use in group chats
+BOT_USERNAME = None
 
-# Create two clients - one for bot commands and one for user operations
-bot = TelegramClient('bot_session', API_ID, API_HASH)
-user_client = TelegramClient('user_session', API_ID, API_HASH)
+async def get_bot_info():
+    """Get the bot's username to handle group commands"""
+    global BOT_USERNAME
+    if not BOT_USERNAME:
+        bot = get_bot()
+        me = await bot.get_me()
+        BOT_USERNAME = me.username
+        logger.info(f"Bot username: @{BOT_USERNAME}")
 
 async def fetch_messages_with_user(channel_username, limit=20, from_date=None, to_date=None, for_rag=False):
     """
@@ -64,7 +73,7 @@ async def fetch_messages_with_user(channel_username, limit=20, from_date=None, t
                 add_offset=0,
                 hash=0
             ))
-            
+
             if not history.messages:
                 break
                 
@@ -103,18 +112,24 @@ async def fetch_messages_with_user(channel_username, limit=20, from_date=None, t
 
         # Format messages based on whether they're for RAG or display
         if for_rag:
-            # Return raw message text for RAG processing
+            # Return raw message text for RAG processing with sender ID and date
             raw_messages = []
             for message in all_messages:
                 if message.message:  # Only include messages with text
-                    raw_messages.append(message.message)
+                    # Extract the sender ID (might be None for channel posts)
+                    sender_id = getattr(message.from_id, 'user_id', 'Unknown') if message.from_id else 'Channel'
+                    # Format: "From: [ID], Date: [date]\n[message]"
+                    formatted_msg = f"UserId: {sender_id}, Date: {message.date}, Message: {message.message}\n\n"
+                    raw_messages.append(formatted_msg)
             return raw_messages
         else:
             # Format messages into a readable string for display
             result = []
             for message in all_messages:
                 if message.message:  # Only include messages with text
-                    result.append(f"ID: {message.id}, Date: {message.date}\n{message.message}\n")
+                    # Extract the sender ID (might be None for channel posts)
+                    sender_id = getattr(message.from_id, 'user_id', 'Unknown') if message.from_id else 'Channel'
+                    result.append(f"ID: {message.id}, UserId: {sender_id}, Date: {message.date}, Message: {message.message}\n\n")
             return "\n".join(result) if result else "No messages found."
 
     except Exception as e:
@@ -124,7 +139,9 @@ async def fetch_messages_with_user(channel_username, limit=20, from_date=None, t
 @bot.on(events.NewMessage(pattern='/start'))
 async def start_handler(event):
     """Handle the /start command"""
-    await event.respond("👋 Hello! I can retrieve messages from every Telegram channel.\n\n"
+    # Only respond in private chats or if the bot is mentioned in groups
+    if event.is_private or (event.message.message.strip() == f'/start@{BOT_USERNAME}'):
+        await event.respond("👋 Hello! I can retrieve messages from every Telegram channel.\n\n"
                         "Use one of the following commands:\n\n"
                         "1️⃣ Fetch by message count:\n"
                         "/fetch @channel count [number]\n"
@@ -142,9 +159,17 @@ async def start_handler(event):
 async def fetch_handler(event):
     """Handle the /fetch command"""
     try:
+        # Check if it's a group command meant for this bot
+        command = event.message.message.split()[0]
+        if not event.is_private and (command != '/fetch' and command != f'/fetch@{BOT_USERNAME}'):
+            return
+
         # Parse the command arguments
         args = event.message.message.split()
-
+        # Remove the bot username from the command if present
+        if not event.is_private and '@' in args[0]:
+            args[0] = '/fetch'
+            
         if len(args) < 2:
             await event.respond("Please provide a channel username.\n"
                                "Example: /fetch @channel-id count 10")
@@ -266,9 +291,17 @@ async def rag_handler(event):
 async def rag_handler_old(event):
     """Handle the /rag command to fetch messages and process them with RAG"""
     try:
+        # Check if it's a group command meant for this bot
+        command = event.message.message.split()[0]
+        if not event.is_private and (command != '/rag' and command != f'/rag@{BOT_USERNAME}'):
+            return
+
         # Parse the command arguments
         args = event.message.message.split()
-
+        # Remove the bot username from the command if present
+        if not event.is_private and '@' in args[0]:
+            args[0] = '/rag'
+            
         if len(args) < 2:
             await event.respond("Please provide a channel username.\n"
                                "Example: /rag @channel-id count 10 your query here")
@@ -371,6 +404,9 @@ async def main():
     # Start both clients
     await bot.start(bot_token=BOT_TOKEN)
     await user_client.start(PHONE_NUMBER)
+    
+    # Get bot info for handling group commands
+    await get_bot_info()
 
     logger.info("Bot started")
     logger.info("User client started")

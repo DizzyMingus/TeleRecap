@@ -41,7 +41,8 @@ def generate_response(state: Dict[str, Any]) -> Dict[str, Any]:
     
     model = ChatAnthropic(
         model="claude-3-7-sonnet-latest", 
-        api_key=os.environ["ANTHROPIC_API_KEY"]
+        api_key=os.environ["ANTHROPIC_API_KEY"],
+        temperature=0.3
     )
     
     prompt = ChatPromptTemplate.from_template("""
@@ -54,6 +55,27 @@ def generate_response(state: Dict[str, Any]) -> Dict[str, Any]:
     
     Please provide a helpful, accurate, and concise answer based only on the context provided.
     If the context doesn't contain relevant information to answer the question, say so rather than making up information.
+    
+    Make your response more engaging by using appropriate emojis. For example:
+    - Use 💡 when sharing insights or key information
+    - Use ✅ when confirming something is correct or available
+    - Use ❌ when information is not found or unavailable
+    - Use 📊 when presenting data or statistics
+    - Use 🔍 when referencing search results
+    - Use 📝 when providing summaries
+    
+    Start your response with a relevant emoji that sets the tone for your answer.
+    Use section headings with emojis where appropriate to organize longer responses.
+    
+    Also incorporate emojis naturally within your text, especially when:
+    - Expressing emotions (happy 😊, sad 😢, surprised 😲, etc.)
+    - Describing actions (reading 📚, writing ✍️, searching 🔎)
+    - Emphasizing important points ⚠️
+    - Mentioning specific topics (money 💰, time ⏰, technology 💻)
+    - Expressing agreement 👍 or disagreement 👎
+    - Creating visual cues that enhance readability and engagement
+    
+    Balance emoji usage to enhance clarity, not distract from your message.
     """)
     
     if isinstance(context, list):
@@ -84,3 +106,5 @@ def create_rag_graph():
     graph.add_edge("generate", END);
     
     return graph.compile()
+
+
