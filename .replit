@@ -11,8 +11,8 @@ language = "python3"
 requiredFiles = [".replit", "replit.nix"]
 
 [deployment]
-build = ["pip", "install", "-e", "."]
-run = ["python3", "main.py"]
+build = ["sh", "-c", "pip install -e . --config-settings editable-mode=compat"]
+run = ["sh", "-c", "python3 main.py"]
 deploymentTarget = "cloudrun"
 
 [env]
