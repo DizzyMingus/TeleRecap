@@ -76,17 +76,21 @@ async def fetch_channel_messages(bot: Bot, channel_username: str, limit=100):
 
         # Get messages from the channel
         messages = []
-        # The python-telegram-bot library doesn't have get_chat_history method
-        # We need to use other methods like getChatHistory API method
-        result = await bot.get_updates(chat_id=chat.id, limit=limit)
         
-        for message in result:
-            if hasattr(message, 'message') and hasattr(message.message, 'text'):
-                messages.append({
-                    'date': message.message.date,
-                    'text': message.message.text
-                })
-
+        # Unfortunately, bot API has limitations for getting message history
+        # For public channels, we can only get the latest messages
+        # Using getUpdates won't work for channel history
+        
+        # As a simple placeholder, we'll just acknowledge we can't get much history
+        # In a real app, you'd need to use Telegram API (not Bot API) with a user account
+        
+        # Add a placeholder message to indicate the limitation
+        messages.append({
+            'date': datetime.datetime.now(),
+            'text': "Note: Telegram Bot API has limitations for retrieving channel message history. "
+                   "This bot can only interact with new messages it receives after being added to a channel."
+        })
+        
         return messages
     except Exception as e:
         logger.error(f"Error fetching messages: {e}")
@@ -174,14 +178,18 @@ async def main():
     application.add_handler(CommandHandler("get", get_messages_command))
 
     # Start the Bot
-    await application.run_polling(allowed_updates=Update.ALL_TYPES)
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    
+    try:
+        # Keep the bot running until it's stopped
+        await application.updater.stop_polling()
+    finally:
+        # Properly shutdown the application
+        await application.stop()
+        await application.shutdown()
 
 if __name__ == "__main__":
     import asyncio
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        pass  # Graceful exit on keyboard interrupt
-    except RuntimeError as e:
-        if "Cannot close a running event loop" not in str(e):
-            raise  # Re-raise if it's not the specific RuntimeError we're handling
+    asyncio.run(main())
