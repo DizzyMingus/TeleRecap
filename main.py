@@ -1,292 +1,117 @@
+from telethon import TelegramClient, events
+from telethon.tl.functions.messages import GetHistoryRequest
 import os
-import json
 import logging
-import datetime
-from dotenv import load_dotenv
-from telegram import Update, Bot
-from telegram.ext import Application, CommandHandler, filters, ContextTypes
-from telethon import TelegramClient
-from telethon.sessions import StringSession
 import asyncio
+from dotenv import load_dotenv
 
-# Configure logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
-# Bot token for the Telegram Bot API
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+# Configure logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Replit deployment URL
-REPL_URL = os.getenv(
-    'REPL_URL',
-    f"https://{os.environ.get('REPL_SLUG')}.{os.environ.get('REPL_OWNER')}.repl.co"
-)
+# Get credentials from environment variables
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+API_ID = int(os.getenv('API_ID'))
+API_HASH = os.getenv('API_HASH')
+PHONE_NUMBER = os.getenv('PHONE_NUMBER')
 
-# Telegram Client API credentials
-API_ID = int(os.getenv('TELEGRAM_API_ID', '0'))
-API_HASH = os.getenv('TELEGRAM_API_HASH', '')
-SESSION_STRING = os.getenv('TELEGRAM_SESSION_STRING', '')
+# Create two clients - one for bot commands and one for user operations
+bot = TelegramClient('bot_session', API_ID, API_HASH)
+user_client = TelegramClient('user_session', API_ID, API_HASH)
 
-# Initialize Telegram Client
-client = None
-
-# Store user preferences
-user_preferences = {}
-
-
-# Command handler for /start
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 Hello! I'm a Telegram message retrieval bot. I can fetch messages from public channels based on your criteria.\n\n"
-        "To get started, use the /setchannel command to tell me which channel to retrieve messages from.\n"
-        "Example: /setchannel @channelname\n\n"
-        "Then, use /settopic to specify what topics you're interested in.\n"
-        "Example: /settopic technology\n\n"
-        "Use /get to retrieve messages whenever you want!")
-
-
-# Command handler for setting channel
-async def set_channel_command(update: Update,
-                              context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    if not context.args:
-        await update.message.reply_text(
-            "Please provide a channel username.\nExample: /setchannel @channelname"
-        )
-        return
-
-    channel_username = context.args[0]
-
-    # Initialize user preferences if not exists
-    if user_id not in user_preferences:
-        user_preferences[user_id] = {'channel': None, 'topic': None}
-
-    # Store the channel preference
-    user_preferences[user_id]['channel'] = channel_username
-    await update.message.reply_text(
-        f"Channel set to {channel_username}. Use /get to retrieve messages.")
-
-
-# Command handler for setting topic
-async def set_topic_command(update: Update,
-                            context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    if not context.args:
-        await update.message.reply_text(
-            "Please provide a topic.\nExample: /settopic technology")
-        return
-
-    topic = ' '.join(context.args)
-
-    # Initialize user preferences if not exists
-    if user_id not in user_preferences:
-        user_preferences[user_id] = {'channel': None, 'topic': None}
-
-    user_preferences[user_id]['topic'] = topic
-    await update.message.reply_text(
-        f"Topic set to '{topic}'. Use /get to retrieve relevant messages.")
-
-
-# Function to fetch messages from a channel
-async def fetch_channel_messages(bot: Bot, channel_username: str, limit=100):
+async def fetch_messages_with_user(channel_username, limit=20):
+    """Fetch messages from a specific channel using the user client"""
     try:
-        global client
+        # Make sure the user client is connected
+        if not user_client.is_connected():
+            await user_client.connect()
 
-        # Initialize the Telegram client if not already done
-        if client is None:
-            client = TelegramClient(StringSession(SESSION_STRING), API_ID,
-                                    API_HASH)
-            await client.connect()
+        # Get the channel entity@.env move the secret key value pairs to .env file
+        chat = await user_client.get_entity(channel_username)
 
-            # Check if we need to sign in
-            if not await client.is_user_authorized():
-                logger.warning(
-                    "Telethon client is not authorized. Sessions string might be invalid or missing."
-                )
-                # We can't perform authorization here as it's an automated process
-                # You would need to run a separate script to generate a session string
+        # Retrieve messages using the user client
+        messages = await user_client(GetHistoryRequest(
+            peer=chat,
+            limit=limit,
+            offset_date=None,
+            offset_id=0,
+            max_id=0,
+            min_id=0,
+            add_offset=0,
+            hash=0
+        ))
 
-                # Return placeholder message
-                return [{
-                    'date':
-                    datetime.datetime.now(),
-                    'text':
-                    "Error: Telegram client is not authorized. Contact the administrator."
-                }]
+        # Format messages into a readable string
+        result = []
+        for message in messages.messages:
+            if message.message:  # Only include messages with text
+                result.append(f"ID: {message.id}, Date: {message.date}\n{message.message}\n")
 
-        # Get entity (channel) information
-        entity = await client.get_entity(channel_username)
+        return "\n".join(result) if result else "No messages found."
 
-        # Fetch messages from the channel
-        messages = []
-        async for message in client.iter_messages(entity, limit=limit):
-            if message.text:  # Only include messages with text
-                messages.append({
-                    'date': message.date,
-                    'text': message.text,
-                    'id': message.id
-                })
-
-        return messages
     except Exception as e:
         logger.error(f"Error fetching messages: {e}")
-        return [{
-            'date': datetime.datetime.now(),
-            'text': f"Error fetching messages: {str(e)}"
-        }]
+        return f"Error fetching messages: {e}"
 
+@bot.on(events.NewMessage(pattern='/start'))
+async def start_handler(event):
+    """Handle the /start command"""
+    await event.respond("👋 Hello! I can retrieve messages from every Telegram channel.\n\n"
+                        "Use /fetch @channel-id [number of messages] to get messages.\n"
+                        "Example: /fetch durov 5")
 
-# Command to get messages
-async def get_messages_command(update: Update,
-                               context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    # Check if channel is set
-    if user_id not in user_preferences or not user_preferences[user_id][
-            'channel']:
-        await update.message.reply_text(
-            "Please set a channel first using /setchannel @channelname")
-        return
-
-    channel = user_preferences[user_id]['channel']
-    topic = user_preferences[user_id]['topic']
-
-    # Parse limit parameter if provided
-    limit = 100  # Default limit
-    if context.args and context.args[0].isdigit():
-        limit = min(int(context.args[0]),
-                    100)  # Cap at 100 to avoid overloading
-
-    await update.message.reply_text(f"Retrieving messages from {channel}" + (
-        f" related to '{topic}'" if topic else "") + f" (limit: {limit})...")
-
+@bot.on(events.NewMessage(pattern='/fetch'))
+async def fetch_handler(event):
+    """Handle the /fetch command"""
     try:
-        # Fetch messages from the channel
-        bot = context.bot
-        messages = await fetch_channel_messages(bot, channel, limit)
+        # Parse the command arguments
+        args = event.message.message.split()
 
-        if messages:
-            # Filter messages by topic if specified
-            if topic:
-                filtered_messages = [
-                    msg for msg in messages
-                    if topic.lower() in msg['text'].lower()
-                ]
-            else:
-                filtered_messages = messages
+        if len(args) < 2:
+            await event.respond("Please provide a channel username.\n"
+                               "Example: /fetch channel-id 10")
+            return
 
-            if filtered_messages:
-                result = f"Retrieved {len(filtered_messages)} messages:\n\n"
-                for i, msg in enumerate(filtered_messages[:20],
-                                        1):  # Limit to 20 in the response
-                    # Format date
-                    date_str = msg['date'].strftime("%Y-%m-%d %H:%M")
-                    # Truncate long messages
-                    truncated_text = msg['text'][:100] + ("..." if len(
-                        msg['text']) > 100 else "")
-                    result += f"{i}. [{date_str}] {truncated_text}\n\n"
+        channel = args[1]
+        if not channel.startswith('@'):
+            channel = '@' + channel
 
-                if len(filtered_messages) > 20:
-                    result += f"... and {len(filtered_messages) - 20} more messages."
+        # Get the limit if provided
+        limit = 10  # Default limit
+        if len(args) >= 3 and args[2].isdigit():
+            limit = min(int(args[2]), 100)  # Cap at 100 to avoid large responses
 
-                await update.message.reply_text(result)
-            else:
-                await update.message.reply_text(
-                    f"No messages related to '{topic}' were found.")
-        else:
-            await update.message.reply_text("No messages found in the channel."
-                                            )
+        await event.respond(f"Fetching up to {limit} messages from {channel}...")
+
+        # Fetch the messages using the user client
+        messages = await fetch_messages_with_user(channel, limit)
+
+        # Send messages in chunks due to Telegram message size limits
+        max_length = 4000
+        for i in range(0, len(messages), max_length):
+            chunk = messages[i:i+max_length]
+            await event.respond(chunk if chunk else "No messages to display.")
+
     except Exception as e:
-        logger.error(f"Error retrieving messages: {e}")
-        await update.message.reply_text(f"Error retrieving messages: {str(e)}")
-
-
-# Command to help
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_text = (
-        "Here are the commands you can use:\n\n"
-        "/start - Start the bot\n"
-        "/help - Get help\n"
-        "/setchannel @channelname - Set the channel to retrieve messages from\n"
-        "/settopic topic - Set your topic of interest\n"
-        "/get [limit] - Get messages (optionally specify how many)\n\n"
-        "Example workflow:\n"
-        "1. /setchannel @channelname\n"
-        "2. /settopic technology\n"
-        "3. /get 50")
-    await update.message.reply_text(help_text)
-
+        logger.error(f"Error in fetch handler: {e}")
+        await event.respond(f"Error: {str(e)}")
 
 async def main():
-    global client
+    # Start both clients
+    await bot.start(bot_token=BOT_TOKEN)
+    await user_client.start(PHONE_NUMBER)
 
-    # Log bot initialization with masked token
-    masked_token = BOT_TOKEN[:4] + '*' * (
-        len(BOT_TOKEN) - 8) + BOT_TOKEN[-4:] if BOT_TOKEN else None
-    logger.info(f"Initializing Telegram Bot with token: {masked_token}")
+    logger.info("Bot started")
+    logger.info("User client started")
 
-    # Initialize the Telegram Bot
-    application = Application.builder().token(BOT_TOKEN).build()
-    logger.info("Telegram Bot application built successfully")
+    # Run until disconnected
+    await asyncio.gather(
+        bot.run_until_disconnected(),
+        user_client.disconnected
+    )
 
-    # Add command handlers
-    logger.info("Registering command handlers...")
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("setchannel", set_channel_command))
-    application.add_handler(CommandHandler("settopic", set_topic_command))
-    application.add_handler(CommandHandler("get", get_messages_command))
-    logger.info("Command handlers registered successfully")
-
-    try:
-        if not SESSION_STRING:
-            logger.error(
-                "No SESSION_STRING found. Please run generate_session.py first."
-            )
-            return
-
-        client = TelegramClient(StringSession(SESSION_STRING), API_ID,
-                                API_HASH)
-        await client.connect()
-        if not await client.is_user_authorized():
-            logger.error(
-                "Telethon client is not authorized. The session string may be invalid."
-            )
-            logger.error(
-                "Please run generate_session.py to generate a new session string."
-            )
-            return
-        else:
-            me = await client.get_me()
-            logger.info(
-                f"Successfully connected to Telegram as {me.first_name} (ID: {me.id})"
-            )
-    except Exception as e:
-        logger.error(f"Error initializing Telethon client: {e}")
-        return
-
-    # Start the Bot
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-
-    try:
-        # Keep the bot running until it's stopped
-        await application.run_polling()
-    finally:
-        # Properly shutdown the application and client
-        if client and client.is_connected():
-            await client.disconnect()
-        await application.stop()
-        await application.shutdown()
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(main())
