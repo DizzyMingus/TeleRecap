@@ -21,6 +21,9 @@ load_dotenv()
 # Bot token for the Telegram Bot API
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
+# Replit deployment URL
+REPL_URL = os.getenv('REPL_URL', f"https://{os.environ.get('REPL_SLUG')}.{os.environ.get('REPL_OWNER')}.repl.co")
+
 # Telegram Client API credentials
 API_ID = int(os.getenv('TELEGRAM_API_ID', '0'))
 API_HASH = os.getenv('TELEGRAM_API_HASH', '')
@@ -268,7 +271,7 @@ async def main():
     await application.updater.start_webhook(
         listen="0.0.0.0",  # Listen on all network interfaces
         port=8080,         # Standard port for Cloud Run
-        webhook_url=None,  # Let Telegram use the URL it receives requests from
+        webhook_url=REPL_URL,  # Use the Replit deployment URL
         allowed_updates=Update.ALL_TYPES
     )
 
