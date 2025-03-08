@@ -92,27 +92,27 @@ async def set_topic_command(update: Update,
 async def fetch_channel_messages(bot: Bot, channel_username: str, limit=100):
     try:
         global client
-        
+
         # Initialize the Telegram client if not already done
         if client is None:
             client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
             await client.connect()
-            
+
             # Check if we need to sign in
             if not await client.is_user_authorized():
                 logger.warning("Telethon client is not authorized. Sessions string might be invalid or missing.")
                 # We can't perform authorization here as it's an automated process
                 # You would need to run a separate script to generate a session string
-                
+
                 # Return placeholder message
                 return [{
                     'date': datetime.datetime.now(),
                     'text': "Error: Telegram client is not authorized. Contact the administrator."
                 }]
-        
+
         # Get entity (channel) information
         entity = await client.get_entity(channel_username)
-        
+
         # Fetch messages from the channel
         messages = []
         async for message in client.iter_messages(entity, limit=limit):
@@ -122,7 +122,7 @@ async def fetch_channel_messages(bot: Bot, channel_username: str, limit=100):
                     'text': message.text,
                     'id': message.id
                 })
-        
+
         return messages
     except Exception as e:
         logger.error(f"Error fetching messages: {e}")
@@ -215,11 +215,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
     global client
-    
+
     # Log bot initialization with masked token
     masked_token = BOT_TOKEN[:4] + '*' * (len(BOT_TOKEN) - 8) + BOT_TOKEN[-4:] if BOT_TOKEN else None
     logger.info(f"Initializing Telegram Bot with token: {masked_token}")
-    
+
     # Initialize the Telegram Bot
     application = Application.builder().token(BOT_TOKEN).build()
     logger.info("Telegram Bot application built successfully")
@@ -239,25 +239,31 @@ async def main():
         # Log session string existence (masked for security)
         session_exists = "Available" if SESSION_STRING else "Not available"
         logger.info(f"Telethon session string: {session_exists}")
-        
-        logger.info(f"Initializing Telethon client with API_ID: {API_ID}")
-        client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-        
-        logger.info("Connecting to Telegram servers...")
-        await client.connect()
-        
-        logger.info("Checking authorization status...")
-        if not await client.is_user_authorized():
-            logger.warning("Telethon client is not authorized. Using a valid SESSION_STRING env variable is recommended.")
+
+        # Only attempt to initialize if we have valid credentials
+        if API_ID != 0 and API_HASH and SESSION_STRING:
+            logger.info(f"Initializing Telethon client with API_ID: {API_ID}")
+            # Clean the session string (remove quotes if present)
+            clean_session = SESSION_STRING.strip().strip('"\'')
+            client = TelegramClient(StringSession(clean_session), API_ID, API_HASH)
+
+            logger.info("Connecting to Telegram servers...")
+            await client.connect()
+
+            logger.info("Checking authorization status...")
+            if not await client.is_user_authorized():
+                logger.warning("Telethon client is not authorized. Using a valid SESSION_STRING env variable is recommended.")
+            else:
+                logger.info("Telethon client successfully authorized")
         else:
-            logger.info("Telethon client successfully authorized")
+            logger.warning("Missing Telegram API credentials. Channel message retrieval will not work.")
     except Exception as e:
         logger.error(f"Error initializing Telethon client: {e}")
 
     # Start the Bot in webhook mode
     await application.initialize()
     await application.start()
-    
+
     # Use webhook instead of polling for Cloud Run deployments
     await application.updater.start_webhook(
         listen="0.0.0.0",  # Listen on all network interfaces
@@ -265,9 +271,9 @@ async def main():
         webhook_url=None,  # Let Telegram use the URL it receives requests from
         allowed_updates=Update.ALL_TYPES
     )
-    
+
     logger.info(f"Bot started and listening on port 8080")
-    
+
     # Keep the application running
     try:
         # In webhook mode, we need to keep the application running
