@@ -40,7 +40,7 @@ def generate_response(state: Dict[str, Any]) -> Dict[str, Any]:
     query = state.get("query", "")
     
     model = ChatAnthropic(
-        model="claude-3-5-sonnet-20241022", 
+        model="claude-3-7-sonnet-latest", 
         api_key=os.environ["ANTHROPIC_API_KEY"]
     )
     
