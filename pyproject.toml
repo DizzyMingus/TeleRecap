@@ -10,4 +10,5 @@ dependencies = [
     "schedule>=1.2.2",
     "python-telegram-bot[job-queue]>=20.0",
     "telegram>=0.0.1",
+    "telethon>=1.25.0",
 ]
