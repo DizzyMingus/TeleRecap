@@ -1,3 +1,4 @@
+import re
 from telethon import TelegramClient, events
 from telethon.tl.functions.messages import GetHistoryRequest
 import os
@@ -220,8 +221,49 @@ async def fetch_handler(event):
         logger.error(f"Error in fetch handler: {e}")
         await event.respond(f"Error: {str(e)}")
 
-@bot.on(events.NewMessage(pattern='/rag'))
+@bot.on(events.NewMessage(pattern=r'^@'))
 async def rag_handler(event):
+    """Handle messages in the format @<channel_name> [prompt]"""
+    try:
+        args = event.message.message.split()
+
+
+        if len(args) < 2:
+            await event.respond("Invalid format. Please use: @channel_name [your prompt]")
+            return 
+
+        channel_name = args[0]
+        prompt = " ".join(args[1:])
+    
+        limit = 100  # Cap at 100 to avoid large responses
+        
+        await event.respond(f"Fetching up to {limit} messages from {channel_name} and processing your query: '{prompt}'...")
+        
+        # Fetch raw messages for RAG
+        raw_messages = await fetch_messages_with_user(channel_name, limit=100, for_rag=True)
+            
+        # Check if we have any messages to process
+        if not raw_messages:
+            await event.respond("No messages found to process with RAG.")
+            return
+            
+        # Process the messages with RAG
+        await event.respond("Processing your query with RAG. Please wait...")
+
+        rag_graph = create_rag_graph()
+        rag_response = rag_graph.invoke({"retrieved_documents": raw_messages, "query": prompt})
+
+        output_response = rag_response["response"]
+
+        # Send the RAG response
+        await event.respond(f"RAG Response for query '{prompt}':\n\n{output_response}")
+
+    except Exception as e:
+        logger.error(f"Error in RAG handler: {e}")
+        await event.respond(f"Error processing with RAG: {str(e)}")
+
+@bot.on(events.NewMessage(pattern='/rag'))
+async def rag_handler_old(event):
     """Handle the /rag command to fetch messages and process them with RAG"""
     try:
         # Parse the command arguments
