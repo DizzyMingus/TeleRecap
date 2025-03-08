@@ -254,16 +254,27 @@ async def main():
     except Exception as e:
         logger.error(f"Error initializing Telethon client: {e}")
 
-    # Start the Bot
+    # Start the Bot in webhook mode
     await application.initialize()
     await application.start()
-    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-
+    
+    # Use webhook instead of polling for Cloud Run deployments
+    await application.updater.start_webhook(
+        listen="0.0.0.0",  # Listen on all network interfaces
+        port=8080,         # Standard port for Cloud Run
+        webhook_url=None,  # Let Telegram use the URL it receives requests from
+        allowed_updates=Update.ALL_TYPES
+    )
+    
+    logger.info(f"Bot started and listening on port 8080")
+    
+    # Keep the application running
     try:
-        # Keep the bot running until it's stopped
-        await application.updater._stop_polling()
-    finally:
-        # Properly shutdown the application and client
+        # In webhook mode, we need to keep the application running
+        while True:
+            await asyncio.sleep(3600)  # Just keep the bot running
+    except (KeyboardInterrupt, SystemExit):
+        # Graceful shutdown
         if client:
             await client.disconnect()
         await application.stop()
