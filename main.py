@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timezone
 from rag import create_rag_graph  # Import RAG functionality
 from get_telegram_client import get_bot, get_user_client  # Import client factory functions
-
+# from tools.get_telegram_username import get_telegram_username
 # Load environment variables from .env file
 load_dotenv()
 
@@ -118,6 +118,9 @@ async def fetch_messages_with_user(channel_username, limit=20, from_date=None, t
                 if message.message:  # Only include messages with text
                     # Extract the sender ID (might be None for channel posts)
                     sender_id = getattr(message.from_id, 'user_id', 'Unknown') if message.from_id else 'Channel'
+
+                    # username = await get_telegram_username(sender_id)
+
                     # Format: "From: [ID], Date: [date]\n[message]"
                     formatted_msg = f"UserId: {sender_id}, Date: {message.date}, Message: {message.message}\n\n"
                     raw_messages.append(formatted_msg)
@@ -129,6 +132,7 @@ async def fetch_messages_with_user(channel_username, limit=20, from_date=None, t
                 if message.message:  # Only include messages with text
                     # Extract the sender ID (might be None for channel posts)
                     sender_id = getattr(message.from_id, 'user_id', 'Unknown') if message.from_id else 'Channel'
+                    # username = await get_telegram_username(sender_id)
                     result.append(f"ID: {message.id}, UserId: {sender_id}, Date: {message.date}, Message: {message.message}\n\n")
             return "\n".join(result) if result else "No messages found."
 

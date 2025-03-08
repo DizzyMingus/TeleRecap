@@ -76,6 +76,8 @@ def generate_response(state: Dict[str, Any]) -> Dict[str, Any]:
     - Creating visual cues that enhance readability and engagement
     
     Balance emoji usage to enhance clarity, not distract from your message.
+    
+    IMPORTANT: Detect the language of the user's query and respond in the same language. If the query is in English, respond in English. If the query is in Spanish, respond in Spanish, and so on. Match the language of your response to the language used in the query.
     """)
     
     if isinstance(context, list):

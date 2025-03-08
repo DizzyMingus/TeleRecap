@@ -29,29 +29,18 @@ async def get_telegram_username(user_id: int) -> Optional[str]:
     # Check if user_id is valid
     if not isinstance(user_id, int) or user_id <= 0:
         raise ValueError("Invalid user ID provided")
+
     
     client = get_user_client()
     
-    try:
-        # Connect to Telegram
-        await client.connect()
-        
-        # Check if we're authorized
-        if not await client.is_user_authorized():
-            raise ConnectionError("Not authorized with Telegram. Please run authorization first.")
-        
-        # Load dialogs to ensure the session is properly initialized
-        await client.get_dialogs()
-        
-        # Get user entity
-        user_entity = await client.get_entity(int(user_id))
-        
-        # Return the username
-        return user_entity.username
-            
-    finally:
-        # Always disconnect properly
-        await client.disconnect()
+    # Connect to Telegram
+    await client.get_dialogs()
+
+    # Get user entity
+    user_entity = await client.get_entity(int(user_id))
+
+    # Return the username
+    return user_entity.username
 
 # Synchronous wrapper for convenience
 def get_telegram_username_sync(user_id: int) -> Optional[str]:
